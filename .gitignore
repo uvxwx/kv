@@ -1,0 +1,14 @@
+plan.md
+security.md
+.python-version
+design.md
+.clangd
+.devenv
+.devenv.flake.nix
+.envrc
+.cache
+.pre-commit-config.yaml
+notes.md
+build/
+__pycache__/
+*.pyc

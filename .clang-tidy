@@ -1,0 +1,65 @@
+Checks: >
+  -*,
+  clang-diagnostic-*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-empty-catch,
+  readability-identifier-naming,
+  readability-misleading-indentation,
+  readability-suspicious-call-argument,
+  readability-redundant-control-flow,
+  misc-unused-using-decls,
+  misc-unused-alias-decls,
+  modernize-use-nullptr,
+  modernize-use-bool-literals,
+  modernize-use-override
+
+HeaderFilterRegex: '(^|.*/)(src|include|test)/'
+ExcludeHeaderFilterRegex: ''
+
+WarningsAsErrors: 'clang-diagnostic-*,bugprone-*,readability-*,misc-*,modernize-*'
+
+SystemHeaders: false
+UseColor: true
+
+HeaderFileExtensions: ['h', 'hh', 'hpp', 'hxx']
+ImplementationFileExtensions: ['c', 'cc', 'cpp', 'cxx']
+
+FormatStyle: none
+
+ExtraArgs: []
+ExtraArgsBefore: []
+
+CheckOptions:
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.MethodCase
+    value: camelBack
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.ParameterCase
+    value: camelBack
+  - key: readability-identifier-naming.ClassMemberCase
+    value: camelBack
+  - key: readability-identifier-naming.ClassMemberPrefix
+    value: ''
+  - key: readability-identifier-naming.ConstantCase
+    value: camelBack
+  - key: readability-identifier-naming.ConstantPrefix
+    value: ''
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantPrefix
+    value: k
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: k
+  - key: readability-identifier-naming.IgnoreMainLikeFunctions
+    value: '1'

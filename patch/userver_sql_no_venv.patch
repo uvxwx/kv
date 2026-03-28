@@ -1,0 +1,43 @@
+diff --git a/cmake/UserverSql.cmake b/cmake/UserverSql.cmake
+index 00c5e7d36..d0069e93b 100644
+--- a/cmake/UserverSql.cmake
++++ b/cmake/UserverSql.cmake
+@@ -6,12 +6,33 @@ function(_userver_prepare_sql)
+     endif()
+     set(USERVER_SQL_SCRIPTS_PATH "${USERVER_DIR}/scripts/sql")
+ 
+-    userver_venv_setup(
+-        NAME userver-sql
+-        PYTHON_OUTPUT_VAR USERVER_SQL_PYTHON_BINARY
+-        REQUIREMENTS "${USERVER_SQL_SCRIPTS_PATH}/requirements.txt"
+-        UNIQUE
++    option(
++        USERVER_SQL_USE_VENV
++        "Use a dedicated Python virtual environment with pip-installed requirements for SQL helpers"
++        ON
+     )
++
++    set(
++        USERVER_SQL_PYTHON_BINARY
++        ""
++        CACHE FILEPATH
++        "Python interpreter to run SQL helpers when not using venv (or to override default)"
++    )
++
++    if(USERVER_SQL_USE_VENV)
++        userver_venv_setup(
++            NAME userver-sql
++            PYTHON_OUTPUT_VAR USERVER_SQL_PYTHON_BINARY
++            REQUIREMENTS "${USERVER_SQL_SCRIPTS_PATH}/requirements.txt"
++            UNIQUE
++        )
++    else()
++        if(NOT USERVER_SQL_PYTHON_BINARY)
++            # Fall back to the global Python used for venvs/tests if no
++            # explicit interpreter is provided.
++            set(USERVER_SQL_PYTHON_BINARY "${USERVER_PYTHON_PATH}")
++        endif()
++    endif()
+     set_property(GLOBAL PROPERTY userver_sql_python_binary "${USERVER_SQL_PYTHON_BINARY}")
+     set_property(GLOBAL PROPERTY userver_scripts_sql "${USERVER_SQL_SCRIPTS_PATH}")
+ endfunction()

@@ -1,0 +1,51 @@
+name: ci
+on:
+  push:
+  pull_request:
+env:
+  NIX_CONFIG: |
+    experimental-features = nix-command flakes
+    extra-substituters = ${{ secrets.HARMONIA_SUBSTITUTER }} https://devenv.cachix.org
+    extra-trusted-public-keys = ${{ secrets.HARMONIA_PUBLIC_KEY }} devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+defaults:
+  run:
+    shell: bash
+jobs:
+  test-dev:
+    name: build, test (Debug)
+    runs-on: nixos-nix
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+      - name: Build, test (Debug)
+        run: |
+          set -euo pipefail
+          mkdir -p ci-artifacts
+          bash .forgejo/devenv_ci.sh tasks run proj:devBuild 2>&1 | tee ci-artifacts/devBuild.log
+          bash .forgejo/devenv_ci.sh tasks run proj:devTest 2>&1 | tee ci-artifacts/devTest.log
+      - name: Upload artifacts
+        if: failure()
+        uses: https://data.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: test-dev-${{ forgejo.run_number }}-${{ forgejo.sha }}
+          path: ci-artifacts
+          retention-days: 7
+  test-release:
+    name: build, test (Release)
+    runs-on: nixos-nix
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+      - name: Build, test (Release)
+        run: |
+          set -euo pipefail
+          mkdir -p ci-artifacts
+          bash .forgejo/devenv_ci.sh tasks run proj:relBuild 2>&1 | tee ci-artifacts/relBuild.log
+          bash .forgejo/devenv_ci.sh tasks run proj:relTest 2>&1 | tee ci-artifacts/relTest.log
+      - name: Upload artifacts
+        if: failure()
+        uses: https://data.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: test-release-${{ forgejo.run_number }}-${{ forgejo.sha }}
+          path: ci-artifacts
+          retention-days: 7

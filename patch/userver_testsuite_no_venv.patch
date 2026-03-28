@@ -1,0 +1,78 @@
+diff --git a/cmake/UserverTestsuite.cmake b/cmake/UserverTestsuite.cmake
+--- a/cmake/UserverTestsuite.cmake
++++ b/cmake/UserverTestsuite.cmake
+@@ -20,6 +20,19 @@
+     # @ingroup libraries
+     option(USERVER_FEATURE_TESTSUITE "Enable functional tests via testsuite" ON)
+ 
++    option(
++        USERVER_TESTSUITE_USE_VENV
++        "Use a dedicated Python virtual environment with pip-installed requirements for testsuite"
++        ON
++    )
++
++    set(
++        USERVER_TESTSUITE_PYTHON_BINARY
++        ""
++        CACHE FILEPATH
++        "Python interpreter to run testsuite when not using venv (or to override default)"
++    )
++
+     if(USERVER_FEATURE_TESTSUITE AND NOT USERVER_PYTHON_DEV_CHECKED)
+         # find package python3-dev required by venv
+         execute_process(COMMAND sh "-c" "command -v python3-config" OUTPUT_VARIABLE PYTHONCONFIG_FOUND)
+@@ -38,14 +51,22 @@
+     set_property(GLOBAL PROPERTY userver_testsuite_dir "${USERVER_TESTSUITE_DIR}")
+ 
+     if(USERVER_FEATURE_TESTSUITE)
+-        userver_testsuite_requirements(REQUIREMENTS_FILES_VAR requirements_files TESTSUITE_ONLY)
+-        userver_venv_setup(
+-            NAME utest
+-            # TESTSUITE_PYTHON_BINARY is used in `env.in`
+-            PYTHON_OUTPUT_VAR TESTSUITE_PYTHON_BINARY
+-            REQUIREMENTS ${requirements_files}
+-            UNIQUE
+-        )
++        if(USERVER_TESTSUITE_USE_VENV)
++            userver_testsuite_requirements(REQUIREMENTS_FILES_VAR requirements_files TESTSUITE_ONLY)
++            userver_venv_setup(
++                NAME utest
++                # TESTSUITE_PYTHON_BINARY is used in `env.in`
++                PYTHON_OUTPUT_VAR TESTSUITE_PYTHON_BINARY
++                REQUIREMENTS ${requirements_files}
++                UNIQUE
++            )
++        else()
++            if(USERVER_TESTSUITE_PYTHON_BINARY)
++                set(TESTSUITE_PYTHON_BINARY "${USERVER_TESTSUITE_PYTHON_BINARY}")
++            else()
++                set(TESTSUITE_PYTHON_BINARY "${USERVER_PYTHON_PATH}")
++            endif()
++        endif()
+         configure_file("${USERVER_TESTSUITE_DIR}/env.in" "${CMAKE_BINARY_DIR}/testsuite/env" @ONLY)
+     endif()
+ endfunction()
+@@ -182,6 +203,23 @@
+             message(FATAL_ERROR "PYTHON_BINARY and REQUIREMENTS options are incompatible")
+         endif()
+         set(python_binary "${ARG_PYTHON_BINARY}")
++    elseif(NOT USERVER_TESTSUITE_USE_VENV)
++        if(ARG_REQUIREMENTS)
++            message(
++                FATAL_ERROR
++                "Testsuite REQUIREMENTS are only supported when USERVER_TESTSUITE_USE_VENV=ON. "
++                "Install Python dependencies externally and drop REQUIREMENTS."
++            )
++        endif()
++
++        if(NOT TESTSUITE_PYTHON_BINARY)
++            message(
++                FATAL_ERROR
++                "USERVER_TESTSUITE_USE_VENV=OFF but TESTSUITE_PYTHON_BINARY is not set. "
++                "This should have been initialized in _userver_prepare_testsuite()."
++            )
++        endif()
++        set(python_binary "${TESTSUITE_PYTHON_BINARY}")
+     elseif(ARG_REQUIREMENTS)
+         userver_testsuite_requirements(REQUIREMENTS_FILES_VAR requirements_files)
+         list(APPEND requirements_files ${ARG_REQUIREMENTS})

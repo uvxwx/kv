@@ -1,0 +1,50 @@
+diff --git a/cmake/ChaoticGen.cmake b/cmake/ChaoticGen.cmake
+--- a/cmake/ChaoticGen.cmake
++++ b/cmake/ChaoticGen.cmake
+@@ -6,6 +6,19 @@
+ function(_userver_prepare_chaotic)
+     include("${CMAKE_CURRENT_LIST_DIR}/UserverTestsuite.cmake")
+ 
++    option(
++        USERVER_CHAOTIC_USE_VENV
++        "Use a dedicated Python virtual environment with pip-installed requirements for chaotic codegen"
++        ON
++    )
++
++    set(
++        USERVER_CHAOTIC_PYTHON_BINARY
++        ""
++        CACHE FILEPATH
++        "Python interpreter to run chaotic codegen when not using venv (or to override default)"
++    )
++
+     find_program(
+         CHAOTIC_BIN chaotic-gen
+         PATHS "${CMAKE_CURRENT_SOURCE_DIR}/../chaotic/bin" "${CMAKE_CURRENT_LIST_DIR}/../../../bin"
+@@ -41,12 +54,20 @@
+         set(USERVER_CHAOTIC_SCRIPTS_PATH "${USERVER_DIR}/scripts/chaotic")
+     endif()
+ 
+-    userver_venv_setup(
+-        NAME userver-chaotic
+-        PYTHON_OUTPUT_VAR USERVER_CHAOTIC_PYTHON_BINARY
+-        REQUIREMENTS "${USERVER_CHAOTIC_SCRIPTS_PATH}/requirements.txt"
+-        UNIQUE
+-    )
++    if(USERVER_CHAOTIC_USE_VENV)
++        userver_venv_setup(
++            NAME userver-chaotic
++            PYTHON_OUTPUT_VAR USERVER_CHAOTIC_PYTHON_BINARY
++            REQUIREMENTS "${USERVER_CHAOTIC_SCRIPTS_PATH}/requirements.txt"
++            UNIQUE
++        )
++    else()
++        if(NOT USERVER_CHAOTIC_PYTHON_BINARY)
++            # Fall back to the global Python used for venvs/tests if no
++            # explicit interpreter is provided.
++            set(USERVER_CHAOTIC_PYTHON_BINARY "${USERVER_PYTHON_PATH}")
++        endif()
++    endif()
+     set_property(GLOBAL PROPERTY userver_chaotic_python_binary "${USERVER_CHAOTIC_PYTHON_BINARY}")
+ endfunction()
+ 

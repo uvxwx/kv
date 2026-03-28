@@ -1,0 +1,40 @@
+diff --git a/cmake/SetupOpenssl.cmake b/cmake/SetupOpenssl.cmake
+index 348c09872..ef7c1d66f 100644
+--- a/cmake/SetupOpenssl.cmake
++++ b/cmake/SetupOpenssl.cmake
+@@ -1,7 +1,35 @@
+ include_guard(GLOBAL)
+ 
++# If the caller has already provided OpenSSL libraries and include
++# directories (for example, via a package manager like Nix), use them
++# directly and create the imported targets expected by userver.
++if(DEFINED OPENSSL_CRYPTO_LIBRARY AND DEFINED OPENSSL_SSL_LIBRARY AND DEFINED OPENSSL_INCLUDE_DIR)
++    if(NOT TARGET OpenSSL::Crypto)
++        add_library(OpenSSL::Crypto UNKNOWN IMPORTED)
++        set_target_properties(OpenSSL::Crypto PROPERTIES
++            IMPORTED_LOCATION "${OPENSSL_CRYPTO_LIBRARY}"
++            INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}"
++            IMPORTED_LINK_INTERFACE_LANGUAGES "C"
++        )
++    endif()
++
++    if(NOT TARGET OpenSSL::SSL)
++        add_library(OpenSSL::SSL UNKNOWN IMPORTED)
++        set_target_properties(OpenSSL::SSL PROPERTIES
++            IMPORTED_LOCATION "${OPENSSL_SSL_LIBRARY}"
++            INTERFACE_INCLUDE_DIRECTORIES "${OPENSSL_INCLUDE_DIR}"
++            IMPORTED_LINK_INTERFACE_LANGUAGES "C"
++            INTERFACE_LINK_LIBRARIES OpenSSL::Crypto
++        )
++    endif()
++
++    set(OpenSSL_FOUND TRUE CACHE BOOL "" FORCE)
++    set(OPENSSL_FOUND TRUE CACHE BOOL "" FORCE)
++    return()
++endif()
++
+ # @ingroup download
+ option(USERVER_DOWNLOAD_PACKAGE_OPENSSL "Download and setup OpenSSL if no library of matching version was found"
+        ${USERVER_DOWNLOAD_PACKAGES}
+ )
+ # @ingroup download

@@ -1,0 +1,13 @@
+Language: Cpp
+Standard: Auto
+AlignAfterOpenBracket: BlockIndent
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+BreakBeforeBraces: WebKit
+ColumnLimit: 100
+IndentAccessModifiers: false
+IndentCaseLabels: false
+LineEnding: LF
+PenaltyBreakAssignment: 100
+AccessModifierOffset: -4

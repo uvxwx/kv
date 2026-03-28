@@ -1,0 +1,20 @@
+diff --git a/cmake/modules/Findcctz.cmake b/cmake/modules/Findcctz.cmake
+--- a/cmake/modules/Findcctz.cmake
++++ b/cmake/modules/Findcctz.cmake
+@@ -11,4 +11,16 @@
+ 
+ _userver_module_find_library(NAMES cctz)
+ 
++if(NOT cctz_VERSION)
++    # Try to obtain cctz version from a CMake package config if available.
++    # This allows environments without dpkg/rpm/pkg/pkg-config (e.g. Nix) to
++    # provide a versioned cctz via cctzConfig.cmake.
++    find_package(cctz CONFIG QUIET)
++    if(DEFINED cctz_VERSION)
++        # keep as is
++    elseif(DEFINED CCTZ_VERSION)
++        set(cctz_VERSION "${CCTZ_VERSION}")
++    endif()
++endif()
++
+ _userver_module_end()

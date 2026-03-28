@@ -1,0 +1,17 @@
+diff --git a/universal/CMakeLists.txt b/universal/CMakeLists.txt
+--- a/universal/CMakeLists.txt
++++ b/universal/CMakeLists.txt
+@@ -126,13 +126,6 @@
+     )
+ endif()
+ 
+-# Check stdlib is recent enough
+-include(CheckIncludeFileCXX)
+-check_include_file_cxx(variant HAS_CXX17_VARIANT)
+-if(NOT HAS_CXX17_VARIANT)
+-    message(FATAL_ERROR "You have an outdated standard C++ library")
+-endif()
+-
+ option(USERVER_NO_WERROR "Do not treat warnings as errors" ON)
+ if(NOT USERVER_NO_WERROR)
+     message(STATUS "Forcing warnings as errors!")
