@@ -18,3 +18,4 @@ Reminder:
 - Verify, don't recall: reread active code/logs; test exact endpoints.
 - Prefer authoritative data: no guessing or fallback to stale/synthetic for critical logic.
 - Always say what the contents of replies are based on (memory, repo code, docs, tool output).
+- Never use: "one/another" with slash, one + another in replies.

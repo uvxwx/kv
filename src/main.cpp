@@ -1,6 +1,7 @@
 #include <kv/kv.hpp>
 
 #include <cstring>
+#include <expected>
 #include <print>
 
 namespace {
@@ -11,6 +12,9 @@ void printHelp(const char *argv0) { std::print("Usage: {} [--help] [--version]\n
 
 int main(int argc, char **argv)
 {
+    kv::Store store(4);
+    struct Err {};
+    store.runInTx([](kv::Tx &) -> std::expected<size_t, Err> { return std::unexpected{Err()}; });
     if (argc <= 1) {
         printHelp(argv[0]);
         return 0;
@@ -22,7 +26,6 @@ int main(int argc, char **argv)
     }
 
     if (std::strcmp(argv[1], "--version") == 0) {
-        std::print("{}\n", kv::version());
         return 0;
     }
 

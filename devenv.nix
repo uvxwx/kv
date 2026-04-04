@@ -37,19 +37,49 @@
     )
     gitignorePatterns;
 
-  # Match `../webshot` so we don't accidentally build a different userver
-  # variant (and trigger a full rebuild) when switching between repos.
-  userverPkg = userverPkgs.userver-debug-addr-ub;
-  userverDir = "${userverPkg}/lib/cmake/userver";
+  userverDebugPkg = userverPkgs.userver-debug-addr-ub;
+  userverReleasePkg = userverPkgs.userver-release;
+  userverDebugDir = "${userverDebugPkg}/lib/cmake/userver";
+  userverReleaseDir = "${userverReleasePkg}/lib/cmake/userver";
   testLibs = userverDeps ++ [pkgsWithOverlay.stdenv.cc.cc];
   runtimeLdLibraryPath = lib.makeLibraryPath testLibs;
 
-  mkConfigure = buildType: buildDir: ''
+  mkConfigure = {
+    buildType,
+    buildDir,
+    extraCmakeFlags ? [],
+  }: ''
     cmake -S . -B ${lib.escapeShellArg buildDir} -G Ninja \
       -DCMAKE_BUILD_TYPE=${lib.escapeShellArg buildType} \
       -DCMAKE_C_COMPILER=${lib.escapeShellArg "${toolchain.cc}/bin/clang"} \
       -DCMAKE_CXX_COMPILER=${lib.escapeShellArg "${toolchain.cc}/bin/clang++"} \
-      -Duserver_DIR=${lib.escapeShellArg userverDir} \
+      -DUSERVER_DEBUG_INFO_COMPRESSION=z \
+      -Duserver_DIR=${lib.escapeShellArg (
+      if buildType == "Release"
+      then userverReleaseDir
+      else userverDebugDir
+    )} \
+      ${lib.concatMapStringsSep " \\\n      " lib.escapeShellArg extraCmakeFlags}
+  '';
+
+  mkClangdConfig = name: buildDir:
+    pkgsWithOverlay.writeText "kv-clangd-${name}" ''
+      CompileFlags:
+        CompilationDatabase: ${buildDir}
+    '';
+
+  mkConfigureTaskCommands = {
+    buildType,
+    buildDir,
+    clangdConfig,
+    extraCmakeFlags ? [],
+  }: ''
+    ${
+      mkConfigure {
+        inherit buildType buildDir extraCmakeFlags;
+      }
+    }
+    ln -sf "${clangdConfig}" .clangd
   '';
 in {
   imports = [
@@ -58,8 +88,6 @@ in {
   ];
 
   cachix.enable = true;
-
-  difftastic.enable = true;
 
   treefmt = {
     enable = true;
@@ -126,13 +154,16 @@ in {
       yamllint
 
       toolchain.cc
+      llvm21.llvm
       llvm21.clang-tools
-      userverPkg
+      userverDebugPkg
+      userverReleasePkg
     ]
     ++ userverDeps;
 
   env.CMAKE_PREFIX_PATH = lib.makeSearchPath "lib/cmake" [
-    userverPkg
+    userverDebugPkg
+    userverReleasePkg
     pkgsWithOverlay.boost183.dev
     pkgsWithOverlay.fmt.dev
     pkgsWithOverlay.zstd.dev
@@ -146,13 +177,19 @@ in {
 
   env.USERVER_PYTHON = "${userverHelperPython}/bin/python3";
   env.USERVER_PYTHON_PATH = "${userverHelperPython}/bin/python3";
-  env.USERVER_DIR = userverDir;
+  env.USERVER_DIR = userverDebugDir;
 
   tasks."proj:devBuild" = {
     cwd = config.devenv.root;
     exec = ''
       set -euo pipefail
-      ${mkConfigure "Debug" "build/dev"}
+      ${
+        mkConfigureTaskCommands {
+          buildType = "Debug";
+          buildDir = "build/dev";
+          clangdConfig = mkClangdConfig "dev" "build/dev";
+        }
+      }
       cmake --build build/dev
     '';
   };
@@ -161,7 +198,13 @@ in {
     cwd = config.devenv.root;
     exec = ''
       set -euo pipefail
-      ${mkConfigure "Debug" "build/dev"}
+      ${
+        mkConfigureTaskCommands {
+          buildType = "Debug";
+          buildDir = "build/dev";
+          clangdConfig = mkClangdConfig "dev" "build/dev";
+        }
+      }
       cmake --build build/dev
       export LD_LIBRARY_PATH=${lib.escapeShellArg runtimeLdLibraryPath}
       ctest --test-dir build/dev --output-on-failure
@@ -172,7 +215,13 @@ in {
     cwd = config.devenv.root;
     exec = ''
       set -euo pipefail
-      ${mkConfigure "Release" "build/release"}
+      ${
+        mkConfigureTaskCommands {
+          buildType = "Release";
+          buildDir = "build/release";
+          clangdConfig = mkClangdConfig "rel" "build/release";
+        }
+      }
       cmake --build build/release
     '';
   };
@@ -181,10 +230,33 @@ in {
     cwd = config.devenv.root;
     exec = ''
       set -euo pipefail
-      ${mkConfigure "Release" "build/release"}
+      ${
+        mkConfigureTaskCommands {
+          buildType = "Release";
+          buildDir = "build/release";
+          clangdConfig = mkClangdConfig "rel" "build/release";
+        }
+      }
       cmake --build build/release
       export LD_LIBRARY_PATH=${lib.escapeShellArg runtimeLdLibraryPath}
       ctest --test-dir build/release --output-on-failure
+    '';
+  };
+
+  tasks."proj:covTest" = {
+    cwd = config.devenv.root;
+    exec = ''
+      set -euo pipefail
+      ${
+        mkConfigureTaskCommands {
+          buildType = "Release";
+          buildDir = "build/cov";
+          clangdConfig = mkClangdConfig "cov" "build/cov";
+          extraCmakeFlags = ["-DKV_ENABLE_COVERAGE=ON"];
+        }
+      }
+      export LD_LIBRARY_PATH=${lib.escapeShellArg runtimeLdLibraryPath}
+      cmake --build build/cov --target coverage_html
     '';
   };
 }

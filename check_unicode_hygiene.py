@@ -121,6 +121,8 @@ def _should_be_ascii_only(path: str) -> bool:
 
 def _iter_issues_for_text(path: str, text: str, enforce_ascii_only: bool) -> list[Issue]:
     issues: list[Issue] = []
+    _, ext = os.path.splitext(path)
+    unicode_friendly = ext in UNICODE_ALLOWED_EXTENSIONS
     line = 1
     col = 0
     for ch in text:
@@ -146,8 +148,8 @@ def _iter_issues_for_text(path: str, text: str, enforce_ascii_only: bool) -> lis
             )
             continue
 
-        # Always ban known-problematic codepoints.
-        if cp in BANNED_CODEPOINTS:
+        # Keep Markdown fully unicode-friendly for prose and documentation.
+        if not unicode_friendly and cp in BANNED_CODEPOINTS:
             issues.append(
                 Issue(
                     path=path,
@@ -162,7 +164,7 @@ def _iter_issues_for_text(path: str, text: str, enforce_ascii_only: bool) -> lis
 
         # Ban Unicode format characters (includes bidi controls and many invisibles).
         cat = unicodedata.category(ch)
-        if cat == "Cf":
+        if not unicode_friendly and cat == "Cf":
             issues.append(
                 Issue(
                     path=path,
@@ -176,7 +178,7 @@ def _iter_issues_for_text(path: str, text: str, enforce_ascii_only: bool) -> lis
             continue
 
         # Ban non-ASCII whitespace (hard to spot in diffs).
-        if cat == "Zs" and ch != " ":
+        if not unicode_friendly and cat == "Zs" and ch != " ":
             issues.append(
                 Issue(
                     path=path,
@@ -205,7 +207,7 @@ def _iter_issues_for_text(path: str, text: str, enforce_ascii_only: bool) -> lis
 
         # Ban unicode compatibility forms that normalize into plain ASCII (often visually
         # indistinguishable in diffs).
-        if cp >= 0x80:
+        if not unicode_friendly and cp >= 0x80:
             nfkc = unicodedata.normalize("NFKC", ch)
             if nfkc != ch and nfkc and all(ord(x) < 0x80 for x in nfkc):
                 issues.append(
