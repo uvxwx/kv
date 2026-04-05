@@ -4,7 +4,7 @@ This document specifies the **conceptual model** (not implementation) for this p
 
 Based on:
 - Current API shape in `include/kv/kv.hpp` (`kv::Store`, `kv::Tx`, `runInTx`, `runInTxWithRetry`)
-- Goals discussed in chat: pedagogical, not a toy; in-memory; process-local; serializable SS2PL; callback transactions; TTL; waits
+- Goals: in-memory; process-local; serializable SS2PL; callback transactions; TTL; waits
 
 ## Design Goals
 

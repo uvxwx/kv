@@ -12,7 +12,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(KV_ENABLE_COVERAGE
     OFF
     CACHE BOOL "Enable LLVM source-based coverage instrumentation")
+set(KV_ENABLE_BENCHMARK_PROFILING
+    OFF
+    CACHE BOOL "Enable profile-friendly flags for benchmark flamegraphs")
 set(KV_COVERAGE_FLAGS "-fprofile-instr-generate" "-fcoverage-mapping")
+set(KV_PROFILE_FRIENDLY_COMPILE_FLAGS
+    "-fno-omit-frame-pointer" "-fno-optimize-sibling-calls"
+    "-fno-inline-functions")
 
 # Ensure that userver integration does not create Python virtual environments
 # when this project is configured. Helpers should use the system Python
@@ -50,14 +56,17 @@ function(apply_defaults target)
 endfunction()
 
 function(apply_coverage target)
-  if(NOT KV_ENABLE_COVERAGE)
-    return()
+  if(KV_ENABLE_COVERAGE)
+    target_compile_options(${target} PRIVATE ${KV_COVERAGE_FLAGS})
+    get_target_property(targetType ${target} TYPE)
+    if(NOT targetType STREQUAL "STATIC_LIBRARY")
+      target_link_options(${target} PRIVATE ${KV_COVERAGE_FLAGS})
+    endif()
   endif()
 
-  target_compile_options(${target} PRIVATE ${KV_COVERAGE_FLAGS})
-  get_target_property(targetType ${target} TYPE)
-  if(NOT targetType STREQUAL "STATIC_LIBRARY")
-    target_link_options(${target} PRIVATE ${KV_COVERAGE_FLAGS})
+  if(KV_ENABLE_COVERAGE OR KV_ENABLE_BENCHMARK_PROFILING)
+    target_compile_options(${target}
+                           PRIVATE ${KV_PROFILE_FRIENDLY_COMPILE_FLAGS})
   endif()
 endfunction()
 
@@ -79,5 +88,6 @@ apply_coverage(kv_cli)
 
 include(CTest)
 if(BUILD_TESTING)
+  add_subdirectory(benchmark)
   add_subdirectory(test)
 endif()

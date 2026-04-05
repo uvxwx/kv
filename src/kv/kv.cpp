@@ -11,10 +11,10 @@ template <typename T> inline T grabValueOf(std::optional<T> &opt)
     return x;
 }
 
+template <typename T> inline T grabValueOf(std::optional<T> &&opt) { return grabValueOf(opt); }
+
 template <typename T, typename... Us>
 concept oneOf = (std::same_as<T, Us> || ...);
-
-template <typename T> inline T grabValueOf(std::optional<T> &&opt) { return grabValueOf(opt); }
 
 Store::Store(size_t maxConcurrentTxs) noexcept : txSemaphore(maxConcurrentTxs) {}
 
@@ -133,7 +133,7 @@ void sendWakeups(const std::vector<OpHandle *> &toWake)
 Tx::ReconcileResult Tx::reconcileLock(LockSt &lock)
 {
     using enum OpHandle::State;
-    auto ret = ReconcileResult{};
+    ReconcileResult ret;
     auto &waitingReaders = lock.waitingReaders;
     auto &waitingWriters = lock.waitingWriters;
     auto invalidateQueue = [&]<bool E>(OpHandleSet &queue) -> bool {
@@ -226,6 +226,52 @@ Tx::ReconcileResult Tx::reconcileLock(LockSt &lock)
     return ret;
 }
 
+std::vector<OpHandle *> Tx::cleanupEnqueuedFor() noexcept
+{
+    using enum OpHandle::State;
+    std::vector<OpHandle *> toWake;
+    if (!enqueuedFor)
+        return toWake;
+
+    auto &x = *enqueuedFor;
+    bool shouldAwaitSend = false;
+    {
+        std::unique_lock<eng::Mutex> guard{x.lock->mutex};
+        if (x.op->state == kWaiting) {
+            bool erased = false;
+            if (x.isWrite) {
+                erased = x.lock->waitingWriters.erase(x.op.get()) != 0;
+            } else {
+                erased = x.lock->waitingReaders.erase(x.op.get()) != 0;
+            }
+            if (erased)
+                toWake = reconcileLock(*x.lock).toWake;
+        } else {
+            shouldAwaitSend = true;
+        }
+    }
+
+    if (shouldAwaitSend) {
+        x.op->wakeup->WaitNonCancellable();
+        std::unique_lock<eng::Mutex> guard{x.lock->mutex};
+        if (x.op->state == kGranted) {
+            if (x.isWrite) {
+                x.lock->users = None{};
+            } else {
+                auto &activeReaders = std::get<ActiveReaders>(x.lock->users);
+                auto &readers = activeReaders.readers;
+                readers.erase(x.op.get());
+                if (readers.empty())
+                    x.lock->users = None{};
+            }
+            toWake = reconcileLock(*x.lock).toWake;
+        }
+    }
+
+    enqueuedFor = {};
+    return toWake;
+}
+
 template <bool E> Tx::Result<Tx::LockingResult> Tx::acquireLock(std::string key) noexcept
 {
     using enum AbortCause;
@@ -255,7 +301,12 @@ template <bool E> Tx::Result<Tx::LockingResult> Tx::acquireLock(std::string key)
         }
     }
     sendWakeups(toWake);
-    enqueuedFor->op->wakeup->Wait();
+    auto waitStatus = enqueuedFor->op->wakeup->WaitUntil(eng::Deadline{});
+    if (waitStatus == eng::FutureStatus::kCancelled) {
+        aborted = kCancelled;
+        sendWakeups(cleanupEnqueuedFor());
+        return std::unexpected{kAborted};
+    }
     if (enqueuedFor->op->state == OpHandle::State::kAborted) {
         enqueuedFor = {};
         aborted = kContention;
@@ -298,31 +349,7 @@ Tx::~Tx()
         sendWakeups(toWake);
     }
     if (enqueuedFor) {
-        auto &x = *enqueuedFor;
-        std::vector<OpHandle *> toWake;
-        {
-            std::unique_lock<eng::Mutex> guard{x.lock->mutex};
-            if (x.op->state == kWaiting) {
-                if (x.isWrite) {
-                    x.lock->waitingWriters.erase(x.op.get());
-                } else {
-                    x.lock->waitingReaders.erase(x.op.get());
-                }
-            } else if (x.op->state == kGranted) {
-                if (x.isWrite) {
-                    x.lock->users = None{};
-                } else {
-                    auto &activeReaders = std::get<ActiveReaders>(x.lock->users);
-                    auto &readers = activeReaders.readers;
-                    readers.erase(x.op.get());
-                    if (readers.empty())
-                        x.lock->users = None{};
-                }
-            }
-            toWake = reconcileLock(*x.lock).toWake;
-        }
-        sendWakeups(toWake);
-        enqueuedFor = {};
+        sendWakeups(cleanupEnqueuedFor());
     }
 }
 

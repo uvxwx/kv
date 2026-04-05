@@ -19,14 +19,12 @@ Use these rules whenever making C++ changes in this repository.
 - Namespace rules MUST be strictly followed: reuse the existing `namespace us = userver;` pattern where applicable, and use `::name` for global symbols.
 - Use `{}` instead of `std::nullopt` in return statements and obvious initialization sites whenever it compiles.
 - Use `size_t`, `int64_t` (not `std::size_t` or `std::int64_t`).
-- Never use `Type name = Type(...)`; use `auto name = Type(...)` instead to avoid writing the type twice.
+- Never use `Type name = Type(...)`; use `Type name{...}` instead to avoid writing the type twice.
 - Filenames MUST be snake_case (for example, `ip_utils.cpp`).
 - Declarations and definitions MUST exactly match (names and signatures).
 - Do not introduce duplicate code; factor common logic into reusable helpers.
-- Code MUST be designed to handle adversarial input too.
 - Prefer `std::begin`/`std::end` over calling `.begin()`/`.end()` on containers when passing iterators.
 - Postfix arithmetic (`++`, `--`) MUST be used by default.
-- Never set default values in code for component config options; require them in static config or config_vars.
 - Class members must not use a trailing underscore naming style; use regular lowerCamelCase for member variables.
 - Never call `std::chrono::system_clock::now()`; use `userver::utils::datetime::Now()` instead.
 - Mutable lambdas are forbidden.

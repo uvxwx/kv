@@ -43,6 +43,7 @@ public:
     Tx &operator=(const Tx &) = delete;
     enum class AbortCause {
         kContention,
+        kCancelled,
     };
     enum class OpError {
         kAborted,
@@ -53,12 +54,12 @@ public:
     Result<void> insertOrAssign(std::string key, std::string value) noexcept;
     Result<void> erase(std::string key) noexcept;
     Result<std::optional<std::string>> find(std::string key) noexcept;
+    void commit() noexcept;
 
     ~Tx();
 
 private:
     friend class Store;
-    void commit() noexcept;
 
     struct LockOp {
         LockSt *lock;
@@ -88,6 +89,7 @@ private:
         std::vector<OpHandle *> toWake;
     };
 
+    std::vector<OpHandle *> cleanupEnqueuedFor() noexcept;
     ReconcileResult reconcileLock(LockSt &lock);
     template <typename T, bool E> static bool isValidOpAttempt(const OpHandle &op, const T &x);
 };
@@ -151,10 +153,12 @@ public:
         typename T = R::value_type, typename E = R::error_type>
     Result<T, E> runInTx(F &&func) noexcept
     {
-        std::shared_lock<eng::CancellableSemaphore> semLock(txSemaphore);
+        using Unex = std::unexpected<RunInTxError<E>>;
+        SemaphoreLock semLock{txSemaphore};
+        if (!semLock.lock())
+            return Unex{{Aborted{}}};
         Tx tx(*this);
         auto &&result = func(tx);
-        using Unex = std::unexpected<RunInTxError<E>>;
         if (tx.aborted)
             return tx.aborted.value() == Tx::AbortCause::kContention
                        ? Unex{{Aborted{.retriable = true}}}
@@ -171,7 +175,7 @@ public:
     runInTxWithRetry(F &&func, size_t maxAttempts, std::chrono::milliseconds interval) noexcept
     {
         using Unex = std::unexpected<RunInTxError<E>>;
-        if (interval == std::chrono::milliseconds(0))
+        if (maxAttempts == 0)
             return Unex{{InvalidArguments{}}};
         std::mt19937 mt;
         std::uniform_int_distribution<size_t> dMult(1, 3);
@@ -189,6 +193,27 @@ public:
     }
 
 private:
+    class SemaphoreLock final {
+    public:
+        explicit SemaphoreLock(eng::CancellableSemaphore &sem) noexcept : sem(sem) {}
+        SemaphoreLock(const SemaphoreLock &) = delete;
+        SemaphoreLock &operator=(const SemaphoreLock &) = delete;
+
+        [[nodiscard]] bool lock() noexcept
+        {
+            locked = sem.try_lock_shared_until(eng::Deadline{});
+            return locked;
+        }
+
+        ~SemaphoreLock()
+        {
+            if (locked)
+                sem.unlock_shared();
+        }
+
+        eng::CancellableSemaphore &sem;
+        bool locked{false};
+    };
     friend class Tx;
     boost::concurrent_flat_map<std::string, std::unique_ptr<LockSt>> locks;
     boost::concurrent_flat_map<std::string, std::string> map;

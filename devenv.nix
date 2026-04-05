@@ -145,6 +145,7 @@ in {
       ccache
       git
       gdb
+      perf
       python3
       ruff
       ty
@@ -152,6 +153,7 @@ in {
       mold
       shellcheck
       yamllint
+      flamegraph
 
       toolchain.cc
       llvm21.llvm
@@ -257,6 +259,23 @@ in {
       }
       export LD_LIBRARY_PATH=${lib.escapeShellArg runtimeLdLibraryPath}
       cmake --build build/cov --target coverage_html
+    '';
+  };
+
+  tasks."proj:benchFlame" = {
+    cwd = config.devenv.root;
+    exec = ''
+      set -euo pipefail
+      ${
+        mkConfigureTaskCommands {
+          buildType = "Release";
+          buildDir = "build/bench";
+          clangdConfig = mkClangdConfig "bench" "build/bench";
+          extraCmakeFlags = ["-DKV_ENABLE_BENCHMARK_PROFILING=ON"];
+        }
+      }
+      export LD_LIBRARY_PATH=${lib.escapeShellArg runtimeLdLibraryPath}
+      cmake --build build/bench --target benchmark_flamegraph
     '';
   };
 }

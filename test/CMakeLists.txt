@@ -19,6 +19,7 @@ add_cpp_test(
 if(KV_ENABLE_COVERAGE)
   get_property(KV_COVERAGE_TARGETS GLOBAL PROPERTY KV_COVERAGE_TARGETS)
   set(KV_COVERAGE_TARGET_FILES "")
+  set(KV_COVERAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/coverage)
   foreach(tgt IN LISTS KV_COVERAGE_TARGETS)
     list(APPEND KV_COVERAGE_TARGET_FILES $<TARGET_FILE:${tgt}>)
   endforeach()
@@ -26,20 +27,19 @@ if(KV_ENABLE_COVERAGE)
   add_custom_target(
     coverage_html
     COMMAND ${CMAKE_COMMAND} -E remove_directory
-            ${CMAKE_CURRENT_BINARY_DIR}/coverage
+            ${KV_COVERAGE_DIR}
     COMMAND ${CMAKE_COMMAND} -E make_directory
-            ${CMAKE_CURRENT_BINARY_DIR}/coverage
+            ${KV_COVERAGE_DIR}
     COMMAND
-      ${CMAKE_COMMAND} -E env
-      LLVM_PROFILE_FILE=${CMAKE_CURRENT_BINARY_DIR}/coverage/kv-%p.profraw
-      ${CMAKE_CTEST_COMMAND} --output-on-failure
+      bash --noprofile --norc -lc
+      "set -euo pipefail && LLVM_PROFILE_FILE=${KV_COVERAGE_DIR}/kv-%p.profraw ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR} --output-on-failure"
     COMMAND
-      bash -lc
-      "llvm-profdata merge -sparse ${CMAKE_CURRENT_BINARY_DIR}/coverage/kv-*.profraw -o ${CMAKE_CURRENT_BINARY_DIR}/coverage/coverage.profdata"
+      bash --noprofile --norc -lc
+      "set -euo pipefail && llvm-profdata merge -sparse ${KV_COVERAGE_DIR}/kv-*.profraw -o ${KV_COVERAGE_DIR}/coverage.profdata"
     COMMAND
       llvm-cov show --format=html
-      --output-dir=${CMAKE_CURRENT_BINARY_DIR}/coverage/html
-      --instr-profile=${CMAKE_CURRENT_BINARY_DIR}/coverage/coverage.profdata
+      --output-dir=${KV_COVERAGE_DIR}/html
+      --instr-profile=${KV_COVERAGE_DIR}/coverage.profdata
       ${KV_COVERAGE_TARGET_FILES}
       "-ignore-filename-regex=.*/test/.*"
       -show-instantiation-summary
