@@ -83,7 +83,6 @@
   '';
 in {
   imports = [
-    ./devenv/process_compose_compat.nix
     ./devenv/lock_validation.nix
   ];
 
